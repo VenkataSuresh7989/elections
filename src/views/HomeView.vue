@@ -93,7 +93,7 @@ const resetSearch = () => {
       <section class="page-intro">
         <div>
           <div class="eyebrow"><span></span> PERSONNEL DIRECTORY</div>
-          <h1>Polling duty, <span>at a glance.</span></h1>
+          <h1>Staff Dispatch  <span>Lookup</span></h1>
           <p>Find your assignment and deployment information using your registered mobile number.</p>
         </div>
         <div class="roster-count">
@@ -102,17 +102,9 @@ const resetSearch = () => {
         </div>
       </section>
 
-      <div class="row g-4 align-items-stretch">
+      <div class="row g-4">
         <div class="col-12 col-lg-4">
-          <section class="panel-card search-panel h-100">
-            <div class="panel-heading">
-              <span class="heading-icon"><i class="bi bi-search"></i></span>
-              <div>
-                <span class="section-kicker">GET STARTED</span>
-                <h2>Search personnel</h2>
-              </div>
-            </div>
-
+          <section class="panel-card search-panel">
             <form @submit.prevent="getDetails" novalidate>
               <label for="mobileNumber" class="field-label">Registered mobile number</label>
               <div class="phone-control" :class="{ 'has-error': validationError }">
@@ -141,7 +133,7 @@ const resetSearch = () => {
               </div>
               <p id="mobile-help" class="input-help" :class="{ 'input-error': validationError }">
                 <i :class="validationError ? 'bi bi-exclamation-circle' : 'bi bi-lock'"></i>
-                {{ validationError || 'Use the number registered with your polling officer record.' }}
+                {{ validationError || 'Use the mobile number registered with your polling officer record.' }}
               </p>
 
               <div class="form-actions">
@@ -334,6 +326,7 @@ const resetSearch = () => {
 
 .search-panel {
   display: flex;
+  align-self: flex-start;
   flex-direction: column;
   padding: 1.6rem;
 }
@@ -359,7 +352,7 @@ const resetSearch = () => {
 
 .field-label {
   display: block;
-  margin: 2rem 0 0.55rem;
+  margin: 1.25rem 0 0.55rem;
   color: #3a4860;
   font-size: 0.78rem;
   font-weight: 700;
@@ -491,8 +484,8 @@ const resetSearch = () => {
   display: flex;
   align-items: flex-start;
   gap: 0.6rem;
-  margin-top: auto;
-  padding-top: 1.5rem;
+  margin-top: 1.25rem;
+  padding-top: 0;
   color: #8b96a8;
   font-size: 0.7rem;
   line-height: 1.5;
