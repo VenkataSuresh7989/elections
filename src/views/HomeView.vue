@@ -50,6 +50,7 @@ for (const record of officers) {
 const mobileInput = ref('')
 const activeQuery = ref('')
 const hasSearched = ref(false)
+const showAssignment = ref(false)
 const validationError = ref('')
 
 const handleInput = (event) => {
@@ -75,12 +76,18 @@ const getDetails = () => {
   validationError.value = ''
   activeQuery.value = cleaned
   hasSearched.value = true
+  showAssignment.value = true
+}
+
+const backToSearch = () => {
+  showAssignment.value = false
 }
 
 const resetSearch = () => {
   mobileInput.value = ''
   activeQuery.value = ''
   hasSearched.value = false
+  showAssignment.value = false
   validationError.value = ''
 }
 
@@ -88,7 +95,7 @@ const resetSearch = () => {
 </script>
 
 <template>
-  <div class="directory-page">
+  <div class="directory-page" :class="{ 'show-assignment': showAssignment }">
     <div class="container page-container">
       <section class="page-intro">
         <div>
@@ -102,8 +109,8 @@ const resetSearch = () => {
         </div>
       </section>
 
-      <div class="row g-4">
-        <div class="col-12 col-lg-4">
+      <div class="row g-4 directory-content" :class="{ 'show-assignment': showAssignment }">
+        <div class="col-12 col-lg-4 search-column">
           <section class="panel-card search-panel">
             <form @submit.prevent="getDetails" novalidate>
               <label for="mobileNumber" class="field-label">Registered mobile number</label>
@@ -117,7 +124,7 @@ const resetSearch = () => {
                   @input="handleInput"
                   maxlength="10"
                   autocomplete="off"
-                  placeholder="Enter 10-digit number"
+                  placeholder="Enter 10-digit Mobile Number"
                   :aria-invalid="Boolean(validationError)"
                   aria-describedby="mobile-help"
                 />
@@ -154,16 +161,13 @@ const resetSearch = () => {
           </section>
         </div>
 
-        <div class="col-12 col-lg-8">
+        <div class="col-12 col-lg-8 details-column">
           <section class="panel-card details-panel h-100">
-            <div class="details-heading">
-              <div class="panel-heading">
-                <span class="heading-icon details-icon"><i class="bi bi-card-list"></i></span>
-                <div>
-                  <span class="section-kicker">YOUR ASSIGNMENT</span>
-                  <h2>Deployment details</h2>
-                </div>
-              </div>
+            <button type="button" class="mobile-back-button" @click="backToSearch">
+              <i class="bi bi-arrow-left"></i>
+              Back to search
+            </button>
+            <div class="details-heading">             
               <span v-if="hasSearched && filteredRecords.length" class="result-count">
                 {{ filteredRecords.length }} {{ filteredRecords.length === 1 ? 'record' : 'records' }}
               </span>
@@ -219,7 +223,10 @@ const resetSearch = () => {
 
 <style scoped>
 .directory-page {
-  padding: 3.25rem 0 4rem;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 1.25rem 0 4rem;
+  background: linear-gradient(135deg, #f8faff 0%, #edf4ff 55%, #f2faf7 100%);
 }
 
 .page-container {
@@ -352,7 +359,7 @@ const resetSearch = () => {
 
 .field-label {
   display: block;
-  margin: 1.25rem 0 0.55rem;
+  margin: 0.25rem 0 0.55rem;
   color: #3a4860;
   font-size: 0.78rem;
   font-weight: 700;
@@ -426,7 +433,7 @@ const resetSearch = () => {
   align-items: flex-start;
   gap: 0.4rem;
   min-height: 2.25rem;
-  margin: 0.6rem 0 1.3rem;
+  margin: 0.6rem 0 0.5rem;
   color: #8a95a8;
   font-size: 0.72rem;
   line-height: 1.5;
@@ -497,15 +504,15 @@ const resetSearch = () => {
 }
 
 .details-panel {  
-  padding: 1.6rem;
+  padding: 1.25rem 0.5rem;
 }
 
 .details-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 1rem;
-  padding-bottom: 1.25rem;
+  padding-bottom: 1rem;
   border-bottom: 1px solid #eef1f6;
 }
 
@@ -658,8 +665,42 @@ const resetSearch = () => {
 }
 
 @media (max-width: 767.98px) {
+  .directory-page:not(.show-assignment) {
+    display: block;
+  }
+
+  .directory-page:not(.show-assignment) .page-container {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - 6rem);
+  }
+
+  .directory-content:not(.show-assignment) {
+    flex: 1;
+    align-items: center;
+  }
+
+  .directory-content:not(.show-assignment) .details-column,
+  .directory-content.show-assignment .search-column {
+    display: none;
+  }
+
+  .mobile-back-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: .25rem;
+    padding: 0.55rem 0.8rem;
+    border: 1px solid #dce7fa;
+    border-radius: 10px;
+    color: #3478f6;
+    background: #f7faff;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
   .directory-page {
-    padding: 2.25rem 0 3rem;
+    padding: 2rem 0;
   }
 
   .page-intro {
@@ -679,6 +720,12 @@ const resetSearch = () => {
   }
 }
 
+@media (min-width: 768px) {
+  .mobile-back-button {
+    display: none;
+  }
+}
+
 @media (max-width: 420px) {
   .page-intro h1 {
     font-size: 2rem;
@@ -686,7 +733,7 @@ const resetSearch = () => {
 
   .search-panel,
   .details-panel {
-    padding: 1.2rem;
+    padding: .8rem;
   }
 
   .detail-grid {

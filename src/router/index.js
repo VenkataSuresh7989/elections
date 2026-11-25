@@ -1,11 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import MaintancePage from '../views/MaintancePage.vue'
+import HomeView from '../views/HomeView.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'maintenance',
-    component: MaintancePage
+    name: 'home',
+    component: HomeView
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
   }
 ]
 
