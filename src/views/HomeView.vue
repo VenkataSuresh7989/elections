@@ -496,8 +496,7 @@ const resetSearch = () => {
   font-size: 0.95rem;
 }
 
-.details-panel {
-  min-height: 440px;
+.details-panel {  
   padding: 1.6rem;
 }
 
@@ -522,12 +521,11 @@ const resetSearch = () => {
 }
 
 .empty-state {
-  display: flex;
-  min-height: 320px;
+  display: flex;  
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: 1rem;
   text-align: center;
 }
 
