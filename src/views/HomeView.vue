@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { collection, doc, getDocs, limit, orderBy, query, runTransaction } from 'firebase/firestore'
+import { db } from '../firebase'
 import pollingData from '../data/polling_data.json'
 
-const searchHistoryKey = 'elections-user-search-history'
+const searchHistoryCollection = 'elections-user-search-history'
 
 const officers = pollingData.map((record, index) => ({
   id: index,
@@ -71,9 +73,13 @@ const showAssignment = ref(false)
 const showUserStatus = ref(false)
 const validationError = ref('')
 const searchHistory = ref([])
-const searchHistoryError = ref('')
+const searchHistoryLoadError = ref('')
+const searchHistorySaveError = ref('')
+const searchHistoryError = computed(() => searchHistoryLoadError.value || searchHistorySaveError.value)
+const isLoadingSearchHistory = ref(false)
 const recentSearchHistory = computed(() => [...searchHistory.value].reverse())
 const searchHistoryQuery = ref('')
+let searchHistoryLoadRequest = 0
 const filteredSearchHistory = computed(() => {
   const query = searchHistoryQuery.value.trim().toLowerCase()
   if (!query) return recentSearchHistory.value
@@ -90,47 +96,81 @@ const isValidSearchRecord = (record) => record &&
   Array.isArray(record.officerNames) &&
   record.officerNames.every((name) => typeof name === 'string')
 
-const loadSearchHistory = () => {
-  let savedHistory
+const loadSearchHistory = async () => {
+  const requestId = ++searchHistoryLoadRequest
+  const mobileNumbersAtRequestStart = new Set(searchHistory.value.map((record) => record.mobileNumber))
+  isLoadingSearchHistory.value = true
+
   try {
-    savedHistory = window.localStorage.getItem(searchHistoryKey)
+    const historyQuery = query(
+      collection(db, searchHistoryCollection),
+      orderBy('dateTime', 'desc'),
+      limit(100)
+    )
+    const snapshot = await getDocs(historyQuery)
+    const loadedHistory = snapshot.docs.map((savedRecord) => ({
+      id: savedRecord.id,
+      ...savedRecord.data()
+    }))
+    const validHistory = loadedHistory.filter(isValidSearchRecord)
+    if (requestId !== searchHistoryLoadRequest) return
+
+    if (validHistory.length !== loadedHistory.length) {
+      console.error('Some Firestore search records have an invalid format.')
+      searchHistoryLoadError.value = 'Some saved search records could not be displayed.'
+    } else {
+      searchHistoryLoadError.value = ''
+    }
+
+    const loadedMobileNumbers = new Set(validHistory.map((record) => record.mobileNumber))
+    const recordsAddedDuringLoad = searchHistory.value.filter(
+      (record) => !mobileNumbersAtRequestStart.has(record.mobileNumber) &&
+        !loadedMobileNumbers.has(record.mobileNumber)
+    )
+    searchHistory.value = [
+      ...validHistory.reverse(),
+      ...recordsAddedDuringLoad
+    ]
   } catch (error) {
-    console.error('Unable to access saved user search history.', error)
-    searchHistoryError.value = 'Saved search history could not be accessed in this browser.'
-    return
-  }
-
-  if (!savedHistory) return
-
-  let parsedHistory
-  try {
-    parsedHistory = JSON.parse(savedHistory)
-  } catch (error) {
-    console.error('Unable to parse saved user search history.', error)
-    searchHistoryError.value = 'Saved search history is unreadable.'
-    return
-  }
-
-  if (!Array.isArray(parsedHistory)) {
-    console.error('Saved user search history is not a list.')
-    searchHistoryError.value = 'Saved search history has an invalid format.'
-    return
-  }
-
-  searchHistory.value = parsedHistory.filter(isValidSearchRecord)
-  if (searchHistory.value.length !== parsedHistory.length) {
-    console.error('Some saved user search records have an invalid format.')
-    searchHistoryError.value = 'Some saved search records could not be displayed.'
+    console.error('Unable to load shared user search history from Firestore.', error)
+    if (requestId === searchHistoryLoadRequest) {
+      searchHistoryLoadError.value = 'Shared search history could not be loaded from Firestore.'
+    }
+  } finally {
+    if (requestId === searchHistoryLoadRequest) {
+      isLoadingSearchHistory.value = false
+    }
   }
 }
 
-const saveSearchHistory = () => {
+const saveSearchHistory = async (record) => {
   try {
-    window.localStorage.setItem(searchHistoryKey, JSON.stringify(searchHistory.value))
-    searchHistoryError.value = ''
+    const recordReference = doc(db, searchHistoryCollection, record.mobileNumber)
+    const savedRecord = await runTransaction(db, async (transaction) => {
+      const existingRecord = await transaction.get(recordReference)
+      if (existingRecord.exists()) {
+        return { id: existingRecord.id, ...existingRecord.data() }
+      }
+
+      const firestoreRecord = {
+        mobileNumber: record.mobileNumber,
+        officerNames: record.officerNames,
+        dateTime: record.dateTime
+      }
+      transaction.set(recordReference, firestoreRecord)
+      return { id: recordReference.id, ...firestoreRecord }
+    })
+
+    if (!isValidSearchRecord(savedRecord)) {
+      throw new Error('Stored search record has an invalid format.')
+    }
+    searchHistory.value = searchHistory.value.map((saved) =>
+      saved.mobileNumber === record.mobileNumber ? savedRecord : saved
+    )
+    searchHistorySaveError.value = ''
   } catch (error) {
-    console.error('Unable to save user search history.', error)
-    searchHistoryError.value = 'Search history could not be saved in this browser.'
+    console.error('Unable to save shared user search history to Firestore.', error)
+    searchHistorySaveError.value = 'Search history could not be saved to Firestore.'
   }
 }
 
@@ -174,15 +214,14 @@ const getDetails = () => {
   const matchingRecords = mobileIndex.get(activeQuery.value) || []
   const isSaved = searchHistory.value.some((record) => record.mobileNumber === activeQuery.value)
   if (!isSaved) {
-    searchHistory.value = [
-      ...searchHistory.value,
-      {
-        mobileNumber: activeQuery.value,
-        officerNames: [...new Set(matchingRecords.map((record) => displayValue(record.officerName)))],
-        dateTime: new Date().toISOString()
-      }
-    ]
-    saveSearchHistory()
+    const record = {
+      id: activeQuery.value,
+      mobileNumber: activeQuery.value,
+      officerNames: [...new Set(matchingRecords.map((record) => displayValue(record.officerName)))],
+      dateTime: new Date().toISOString()
+    }
+    searchHistory.value = [...searchHistory.value, record]
+    saveSearchHistory(record)
   }
   hasSearched.value = true
   showAssignment.value = true
@@ -192,6 +231,7 @@ const getDetails = () => {
 const openUserStatus = () => {
   searchHistoryQuery.value = ''
   showUserStatus.value = true
+  loadSearchHistory()
 }
 
 const backToSearch = () => {
@@ -387,6 +427,9 @@ const resetSearch = () => {
           </div>
         </header>
 
+        <p v-if="isLoadingSearchHistory && recentSearchHistory.length" class="user-status-empty" role="status">
+          Refreshing shared search history...
+        </p>
         <p v-if="searchHistoryError" class="user-status-error" role="alert">
           {{ searchHistoryError }}
         </p>
@@ -401,7 +444,7 @@ const resetSearch = () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="record in filteredSearchHistory" :key="record.mobileNumber">                
+              <tr v-for="record in filteredSearchHistory" :key="record.id">
                 <td>{{ record.officerNames.length ? record.officerNames.join(', ') : 'No matching officer found' }}</td>
                 <td><time>{{ formatDateTime(record.dateTime) }}</time></td>
                 <td>{{ record.mobileNumber }}</td>
@@ -412,9 +455,12 @@ const resetSearch = () => {
             No search records match "{{ searchHistoryQuery }}".
           </p>
         </div>
+        <p v-else-if="isLoadingSearchHistory" class="user-status-empty" role="status">
+          Loading shared search history...
+        </p>
         <p v-else class="user-status-empty">No successful mobile searches have been saved.</p>
 
-        <p class="user-status-storage-note">Search records are saved in this browser.</p>
+        <p class="user-status-storage-note">Search records are shared with all visitors and are publicly visible.</p>
       </section>
     </div>
   </div>

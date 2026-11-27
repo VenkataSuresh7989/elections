@@ -1,0 +1,18 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /elections-user-search-history/{mobileNumber} {
+      allow read: if true;
+      allow create: if mobileNumber.matches('^[0-9]{10}$')
+        && request.resource.data.keys().hasOnly(['mobileNumber', 'officerNames', 'dateTime'])
+        && request.resource.data.keys().hasAll(['mobileNumber', 'officerNames', 'dateTime'])
+        && request.resource.data.mobileNumber == mobileNumber
+        && request.resource.data.officerNames is list
+        && request.resource.data.officerNames.size() <= 100
+        && request.resource.data.dateTime is string
+        && request.resource.data.dateTime.size() == 24;
+      allow update, delete: if false;
+    }
+  }
+}
