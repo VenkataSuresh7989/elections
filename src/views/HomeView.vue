@@ -1,8 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useStore } from 'vuex'
 import pollingData from '../data/polling_data.json'
 
-const searchHistoryKey = 'elections-user-search-history'
+const store = useStore()
 
 const officers = pollingData.map((record, index) => ({
   id: index,
@@ -70,8 +71,7 @@ const hasSearched = ref(false)
 const showAssignment = ref(false)
 const showUserStatus = ref(false)
 const validationError = ref('')
-const searchHistory = ref([])
-const searchHistoryError = ref('')
+const searchHistory = computed(() => store.state.searchHistory)
 const recentSearchHistory = computed(() => [...searchHistory.value].reverse())
 const searchHistoryQuery = ref('')
 const filteredSearchHistory = computed(() => {
@@ -84,56 +84,6 @@ const filteredSearchHistory = computed(() => {
   ].some((value) => value.toLowerCase().includes(query)))
 })
 
-const isValidSearchRecord = (record) => record &&
-  typeof record.mobileNumber === 'string' &&
-  typeof record.dateTime === 'string' &&
-  Array.isArray(record.officerNames) &&
-  record.officerNames.every((name) => typeof name === 'string')
-
-const loadSearchHistory = () => {
-  let savedHistory
-  try {
-    savedHistory = window.localStorage.getItem(searchHistoryKey)
-  } catch (error) {
-    console.error('Unable to access saved user search history.', error)
-    searchHistoryError.value = 'Saved search history could not be accessed in this browser.'
-    return
-  }
-
-  if (!savedHistory) return
-
-  let parsedHistory
-  try {
-    parsedHistory = JSON.parse(savedHistory)
-  } catch (error) {
-    console.error('Unable to parse saved user search history.', error)
-    searchHistoryError.value = 'Saved search history is unreadable.'
-    return
-  }
-
-  if (!Array.isArray(parsedHistory)) {
-    console.error('Saved user search history is not a list.')
-    searchHistoryError.value = 'Saved search history has an invalid format.'
-    return
-  }
-
-  searchHistory.value = parsedHistory.filter(isValidSearchRecord)
-  if (searchHistory.value.length !== parsedHistory.length) {
-    console.error('Some saved user search records have an invalid format.')
-    searchHistoryError.value = 'Some saved search records could not be displayed.'
-  }
-}
-
-const saveSearchHistory = () => {
-  try {
-    window.localStorage.setItem(searchHistoryKey, JSON.stringify(searchHistory.value))
-    searchHistoryError.value = ''
-  } catch (error) {
-    console.error('Unable to save user search history.', error)
-    searchHistoryError.value = 'Search history could not be saved in this browser.'
-  }
-}
-
 const handleDialogKeydown = (event) => {
   if (event.key === 'Escape' && showUserStatus.value) {
     showUserStatus.value = false
@@ -141,7 +91,6 @@ const handleDialogKeydown = (event) => {
 }
 
 onMounted(() => {
-  loadSearchHistory()
   document.addEventListener('keydown', handleDialogKeydown)
 })
 
@@ -174,15 +123,11 @@ const getDetails = () => {
   const matchingRecords = mobileIndex.get(activeQuery.value) || []
   const isSaved = searchHistory.value.some((record) => record.mobileNumber === activeQuery.value)
   if (!isSaved) {
-    searchHistory.value = [
-      ...searchHistory.value,
-      {
-        mobileNumber: activeQuery.value,
-        officerNames: [...new Set(matchingRecords.map((record) => displayValue(record.officerName)))],
-        dateTime: new Date().toISOString()
-      }
-    ]
-    saveSearchHistory()
+    store.commit('addSearchHistory', {
+      mobileNumber: activeQuery.value,
+      officerNames: [...new Set(matchingRecords.map((record) => displayValue(record.officerName)))],
+      dateTime: new Date().toISOString()
+    })
   }
   hasSearched.value = true
   showAssignment.value = true
@@ -218,7 +163,7 @@ const resetSearch = () => {
           <div class="eyebrow"><span></span> PERSONNEL DIRECTORY</div>
           <h1>Staff Dispatch  <span>Lookup</span></h1>
           <button
-            v-if="searchHistory.length || searchHistoryError"
+            v-if="searchHistory.length"
             type="button"
             class="user-status-button mobile-user-status-button"
             :aria-expanded="showUserStatus"
@@ -298,7 +243,7 @@ const resetSearch = () => {
                 {{ filteredRecords.length }} {{ filteredRecords.length === 1 ? 'record' : 'records' }}
               </span>
               <button
-                v-if="searchHistory.length || searchHistoryError"
+                v-if="searchHistory.length"
                 type="button"
                 class="user-status-button desktop-user-status-button"
                 :aria-expanded="showUserStatus"
@@ -387,10 +332,6 @@ const resetSearch = () => {
           </div>
         </header>
 
-        <p v-if="searchHistoryError" class="user-status-error" role="alert">
-          {{ searchHistoryError }}
-        </p>
-
         <div v-if="recentSearchHistory.length" class="user-status-table-wrap">
           <table class="user-status-table">
             <thead>
@@ -414,7 +355,7 @@ const resetSearch = () => {
         </div>
         <p v-else class="user-status-empty">No successful mobile searches have been saved.</p>
 
-        <p class="user-status-storage-note">Search records are saved in this browser.</p>
+        <p class="user-status-storage-note">Search records are kept in memory and cleared when the app reloads.</p>
       </section>
     </div>
   </div>
