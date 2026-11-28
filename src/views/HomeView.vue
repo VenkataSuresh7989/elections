@@ -96,6 +96,20 @@ const filteredSearchHistory = computed(() => {
     record.dateTime
   ].some((value) => value.toLowerCase().includes(query)))
 })
+const dateSortDirection = ref('desc')
+const sortedFilteredSearchHistory = computed(() => [...filteredSearchHistory.value].sort((first, second) => {
+  const firstTime = new Date(first.dateTime).getTime()
+  const secondTime = new Date(second.dateTime).getTime()
+  const safeFirstTime = Number.isNaN(firstTime) ? 0 : firstTime
+  const safeSecondTime = Number.isNaN(secondTime) ? 0 : secondTime
+  return dateSortDirection.value === 'asc'
+    ? safeFirstTime - safeSecondTime
+    : safeSecondTime - safeFirstTime
+}))
+
+const toggleDateSort = () => {
+  dateSortDirection.value = dateSortDirection.value === 'asc' ? 'desc' : 'asc'
+}
 
 const isValidSearchRecord = (record) => record &&
   typeof record.mobileNumber === 'string' &&
@@ -522,12 +536,24 @@ const resetSearch = () => {
             <thead>
               <tr>
                 <th scope="col">Officer name</th>
-                <th scope="col">Date and time</th>                
+                <th scope="col" :aria-sort="dateSortDirection === 'asc' ? 'ascending' : 'descending'">
+                  <button
+                    type="button"
+                    class="date-sort-button"
+                    aria-label="Sort date and time"
+                    @click="toggleDateSort"
+                  >                    
+                    <i
+                      :class="dateSortDirection === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'"
+                      aria-hidden="true"
+                    ></i>Date and time
+                  </button>
+                </th>
                 <th scope="col">Searched mobile number</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="record in filteredSearchHistory" :key="record.id">
+              <tr v-for="record in sortedFilteredSearchHistory" :key="record.id">
                 <td><span>{{ record.officerNames.join(', ') }}</span></td>
                 <td><time>{{ formatDateTime(record.dateTime) }}</time></td>
                 <td>{{ record.mobileNumber }}</td>
@@ -1104,6 +1130,28 @@ const resetSearch = () => {
   font-size: 0.68rem;
   font-weight: 750;
   white-space: nowrap;
+}
+
+.date-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.date-sort-button:hover,
+.date-sort-button:focus-visible {
+  color: #1e3a8a;
+}
+
+.date-sort-button i {
+  font-size: 0.95rem;
 }
 
 .user-status-table td:first-child {
