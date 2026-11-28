@@ -338,7 +338,7 @@ const resetSearch = () => {
             aria-controls="reset-db"
             @click="openResetDb"
           >
-            <i class="bi bi-trash3"></i> Reset DB
+            <i class="bi bi-trash3"></i> Reset
           </button>
           <p>Find your assignment and deployment information using your registered mobile number.</p>
         </div>
@@ -556,9 +556,8 @@ const resetSearch = () => {
         aria-labelledby="reset-db-title"
       >
         <header class="reset-db-modal-header">
-          <div>
-            <span class="reset-db-eyebrow">DANGER ACTION</span>
-            <h2 id="reset-db-title">Reset database</h2>
+          <div>            
+            <h2 id="reset-db-title">Reset</h2>
           </div>
           <button
             type="button"
@@ -1149,7 +1148,7 @@ const resetSearch = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.15rem;
+  padding: 0.5rem 1.10rem;
   border-bottom: 1px solid #f1e5e5;
 }
 
@@ -1175,8 +1174,8 @@ const resetSearch = () => {
   place-items: center;
   border: 1px solid #e1e5ec;
   border-radius: 10px;
-  color: #6d7889;
-  background: #f8f9fb;
+  color: #ffffff;
+  background: #fb5445;
 }
 
 .reset-db-close:disabled {
