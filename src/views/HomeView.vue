@@ -77,7 +77,9 @@ const searchHistoryLoadError = ref('')
 const searchHistorySaveError = ref('')
 const searchHistoryError = computed(() => searchHistoryLoadError.value || searchHistorySaveError.value)
 const isLoadingSearchHistory = ref(false)
-const recentSearchHistory = computed(() => [...searchHistory.value].reverse())
+const recentSearchHistory = computed(() => [...searchHistory.value]
+  .filter((record) => record.officerNames?.length)
+  .reverse())
 const searchHistoryQuery = ref('')
 let searchHistoryLoadRequest = 0
 const filteredSearchHistory = computed(() => {
@@ -213,7 +215,7 @@ const getDetails = () => {
   activeQuery.value = cleaned
   const matchingRecords = mobileIndex.get(activeQuery.value) || []
   const isSaved = searchHistory.value.some((record) => record.mobileNumber === activeQuery.value)
-  if (!isSaved) {
+  if (matchingRecords.length && !isSaved) {
     const record = {
       id: activeQuery.value,
       mobileNumber: activeQuery.value,
@@ -445,7 +447,7 @@ const resetSearch = () => {
             </thead>
             <tbody>
               <tr v-for="record in filteredSearchHistory" :key="record.id">
-                <td>{{ record.officerNames.length ? record.officerNames.join(', ') : 'No matching officer found' }}</td>
+                <td>{{ record.officerNames.join(', ') }}</td>
                 <td><time>{{ formatDateTime(record.dateTime) }}</time></td>
                 <td>{{ record.mobileNumber }}</td>
               </tr>
