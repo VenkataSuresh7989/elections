@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { collection, doc, getDocs, limit, orderBy, query, runTransaction } from 'firebase/firestore'
+import { collection, doc, getDocs, limit, orderBy, query, runTransaction, writeBatch } from 'firebase/firestore'
 import { db } from '../firebase'
 import pollingData from '../data/polling_data.json'
 
@@ -71,6 +71,11 @@ const activeQuery = ref('')
 const hasSearched = ref(false)
 const showAssignment = ref(false)
 const showUserStatus = ref(false)
+const showResetDb = ref(false)
+const resetDbPassword = ref('')
+const resetDbError = ref('')
+const isResettingDb = ref(false)
+const resetDbSuccess = ref('')
 const validationError = ref('')
 const searchHistory = ref([])
 const searchHistoryLoadError = ref('')
@@ -177,8 +182,12 @@ const saveSearchHistory = async (record) => {
 }
 
 const handleDialogKeydown = (event) => {
-  if (event.key === 'Escape' && showUserStatus.value) {
-    showUserStatus.value = false
+  if (event.key === 'Escape') {
+    if (showResetDb.value) {
+      closeResetDb()
+    } else if (showUserStatus.value) {
+      showUserStatus.value = false
+    }
   }
 }
 
@@ -236,6 +245,58 @@ const openUserStatus = () => {
   loadSearchHistory()
 }
 
+const openResetDb = () => {
+  resetDbPassword.value = ''
+  resetDbError.value = ''
+  resetDbSuccess.value = ''
+  showResetDb.value = true
+  showUserStatus.value = false
+}
+
+const closeResetDb = () => {
+  if (isResettingDb.value) return
+  showResetDb.value = false
+  resetDbPassword.value = ''
+  resetDbError.value = ''
+}
+
+const resetDatabase = async () => {
+  if (resetDbPassword.value !== '9346290172') {
+    resetDbError.value = 'Incorrect password.'
+    return
+  }
+
+  isResettingDb.value = true
+  resetDbError.value = ''
+  resetDbSuccess.value = ''
+
+  try {
+    const historyCollection = collection(db, searchHistoryCollection)
+    const snapshot = await getDocs(historyCollection)
+
+    for (let index = 0; index < snapshot.docs.length; index += 500) {
+      const batch = writeBatch(db)
+      snapshot.docs.slice(index, index + 500).forEach((record) => {
+        batch.delete(record.ref)
+      })
+      await batch.commit()
+    }
+
+    searchHistory.value = []
+    searchHistoryLoadError.value = ''
+    searchHistorySaveError.value = ''
+    resetDbPassword.value = ''
+    resetDbError.value = ''
+    resetDbSuccess.value = ''
+    showResetDb.value = false
+  } catch (error) {
+    console.error('Unable to reset the Firestore database.', error)
+    resetDbError.value = 'Database could not be reset. Please try again.'
+  } finally {
+    isResettingDb.value = false
+  }
+}
+
 const backToSearch = () => {
   showAssignment.value = false
 }
@@ -268,6 +329,16 @@ const resetSearch = () => {
             @click="openUserStatus"
           >
             <i class="bi bi-person-check"></i> Officer Status
+          </button>
+          <button
+            v-if="searchHistory.length || searchHistoryError"
+            type="button"
+            class="reset-db-button mobile-reset-db-button"
+            :aria-expanded="showResetDb"
+            aria-controls="reset-db"
+            @click="openResetDb"
+          >
+            <i class="bi bi-trash3"></i> Reset DB
           </button>
           <p>Find your assignment and deployment information using your registered mobile number.</p>
         </div>
@@ -339,8 +410,8 @@ const resetSearch = () => {
               <span v-if="hasSearched && filteredRecords.length" class="result-count">
                 {{ filteredRecords.length }} {{ filteredRecords.length === 1 ? 'record' : 'records' }}
               </span>
+              <div v-if="searchHistory.length || searchHistoryError" class="status-actions">
               <button
-                v-if="searchHistory.length || searchHistoryError"
                 type="button"
                 class="user-status-button desktop-user-status-button"
                 :aria-expanded="showUserStatus"
@@ -349,6 +420,16 @@ const resetSearch = () => {
               >
                 <i class="bi bi-person-check"></i> Officer Status
               </button>
+              <button
+                type="button"
+                class="reset-db-button desktop-reset-db-button"
+                :aria-expanded="showResetDb"
+                aria-controls="reset-db"
+                @click="openResetDb"
+              >
+                <i class="bi bi-trash3"></i> Reset DB
+              </button>
+              </div>
             </div>
 
             <div v-if="!hasSearched" class="empty-state">
@@ -463,6 +544,52 @@ const resetSearch = () => {
         <p v-else class="user-status-empty">No successful mobile searches have been saved.</p>
 
         <p class="user-status-storage-note">Search records are shared with all visitors and are publicly visible.</p>
+      </section>
+    </div>
+
+    <div v-if="showResetDb" class="reset-db-backdrop" role="presentation" @click.self="closeResetDb">
+      <section
+        id="reset-db"
+        class="reset-db-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reset-db-title"
+      >
+        <header class="reset-db-modal-header">
+          <div>
+            <span class="reset-db-eyebrow">DANGER ACTION</span>
+            <h2 id="reset-db-title">Reset database</h2>
+          </div>
+          <button
+            type="button"
+            class="reset-db-close"
+            aria-label="Close reset database"
+            :disabled="isResettingDb"
+            @click="closeResetDb"
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </header>
+
+        <form class="reset-db-form" @submit.prevent="resetDatabase">
+          <p>This will permanently delete all saved Officer Status records.</p>
+          <label for="reset-db-password">Enter password</label>
+          <input
+            id="reset-db-password"
+            v-model="resetDbPassword"
+            type="password"
+            inputmode="numeric"
+            autocomplete="off"
+            :disabled="isResettingDb"
+            placeholder="Enter reset password"
+          />
+          <p v-if="resetDbError" class="reset-db-error" role="alert">{{ resetDbError }}</p>
+          <p v-if="resetDbSuccess" class="reset-db-success" role="status">{{ resetDbSuccess }}</p>
+          <button type="submit" class="reset-db-confirm" :disabled="isResettingDb">
+            <i class="bi bi-trash3"></i>
+            {{ isResettingDb ? 'Resetting...' : 'Confirm reset' }}
+          </button>
+        </form>
       </section>
     </div>
   </div>
@@ -798,6 +925,49 @@ const resetSearch = () => {
   outline-offset: 3px;
 }
 
+.status-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  margin-left: auto;
+}
+
+.reset-db-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 42px;
+  padding: 0.55rem 1rem;
+  border: 1px solid #e7b1b1;
+  border-radius: 11px;
+  color: #b02a37;
+  background: #fff5f5;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.mobile-reset-db-button {
+  display: none;
+}
+
+.reset-db-button:hover,
+.reset-db-button[aria-expanded="true"] {
+  color: #fff;
+  border-color: #dc3545;
+  background: #dc3545;
+  box-shadow: 0 9px 20px rgba(220, 53, 69, 0.24);
+  transform: translateY(-1px);
+}
+
+.reset-db-button:focus-visible {
+  outline: 3px solid rgba(220, 53, 69, 0.24);
+  outline-offset: 3px;
+}
+
 .user-status-backdrop {
   position: fixed;
   z-index: 1100;
@@ -956,6 +1126,132 @@ const resetSearch = () => {
   font-size: 0.68rem;
 }
 
+.reset-db-backdrop {
+  position: fixed;
+  z-index: 1200;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(19, 31, 52, 0.58);
+}
+
+.reset-db-modal {
+  width: min(430px, 100%);
+  overflow: hidden;
+  border: 1px solid #ecd0d0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(70, 14, 22, 0.28);
+}
+
+.reset-db-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid #f1e5e5;
+}
+
+.reset-db-eyebrow {
+  display: block;
+  margin-bottom: 0.15rem;
+  color: #c03443;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.reset-db-modal-header h2 {
+  margin: 0;
+  color: #2a3445;
+  font-size: 1.15rem;
+}
+
+.reset-db-close {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid #e1e5ec;
+  border-radius: 10px;
+  color: #6d7889;
+  background: #f8f9fb;
+}
+
+.reset-db-close:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.reset-db-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 1.15rem;
+}
+
+.reset-db-form > p:first-child {
+  margin: 0 0 0.25rem;
+  color: #67738a;
+  font-size: 0.82rem;
+}
+
+.reset-db-form label {
+  color: #344158;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.reset-db-form input {
+  min-height: 46px;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #dfe5ef;
+  border-radius: 11px;
+  outline: 0;
+  color: #29364d;
+  background: #fbfcfe;
+  font: inherit;
+}
+
+.reset-db-form input:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.reset-db-error,
+.reset-db-success {
+  margin: 0;
+  padding: 0.65rem 0.75rem;
+  border-radius: 9px;
+  font-size: 0.78rem;
+}
+
+.reset-db-error {
+  color: #a63d3d;
+  background: #fff1f1;
+}
+
+.reset-db-success {
+  color: #25733a;
+  background: #edf8f0;
+}
+
+.reset-db-confirm {
+  min-height: 46px;
+  border: 0;
+  border-radius: 11px;
+  color: #fff;
+  background: #dc3545;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.reset-db-confirm:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .result-count {
   padding: 0.42rem 0.75rem;
   border: 1px solid #d8f0e5;
@@ -1110,7 +1406,14 @@ const resetSearch = () => {
     margin-top: 0.75rem;
   }
 
-  .desktop-user-status-button {
+  .mobile-reset-db-button {
+    display: inline-flex;
+    margin-top: 0.75rem;
+    margin-left: 0.35rem;
+  }
+
+  .desktop-user-status-button,
+  .desktop-reset-db-button {
     display: none;
   }
 
