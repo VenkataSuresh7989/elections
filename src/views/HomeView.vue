@@ -528,7 +528,7 @@ const resetSearch = () => {
             </thead>
             <tbody>
               <tr v-for="record in filteredSearchHistory" :key="record.id">
-                <td>{{ record.officerNames.join(', ') }}</td>
+                <td><span>{{ record.officerNames.join(', ') }}</span></td>
                 <td><time>{{ formatDateTime(record.dateTime) }}</time></td>
                 <td>{{ record.mobileNumber }}</td>
               </tr>
@@ -536,14 +536,14 @@ const resetSearch = () => {
           </table>
           <p v-if="!filteredSearchHistory.length" class="user-status-empty">
             No search records match "{{ searchHistoryQuery }}".
-          </p>
+          </p>          
         </div>
         <p v-else-if="isLoadingSearchHistory" class="user-status-empty" role="status">
           Loading shared search history...
         </p>
         <p v-else class="user-status-empty">No successful mobile searches have been saved.</p>
 
-        <p class="user-status-storage-note">Search records are shared with all visitors and are publicly visible.</p>
+        <p class="user-status-storage-note">Total Records: <strong>{{ filteredSearchHistory.length }}</strong></p>
       </section>
     </div>
 
@@ -1111,6 +1111,23 @@ const resetSearch = () => {
   white-space: nowrap;
 }
 
+.user-status-total {
+  position: sticky;
+  bottom: 0;
+  margin: 0;
+  padding: 0.8rem 1rem;
+  border-top: 1px solid #dfe5ef;
+  color: #65728a;
+  background: #fff;
+  font-size:1rem;
+  text-align: right;
+}
+
+.user-status-total strong {
+  color: #1c2940;
+  font-size: 0.88rem;
+}
+
 .user-status-empty,
 .user-status-storage-note {
   margin: 0;
@@ -1122,7 +1139,7 @@ const resetSearch = () => {
 .user-status-storage-note {
   padding-top: 0.65rem;
   border-top: 1px solid #eef1f6;
-  font-size: 0.68rem;
+  font-size: 0.8rem;
 }
 
 .reset-db-backdrop {
@@ -1476,8 +1493,16 @@ const resetSearch = () => {
     display: none;
   }
 }
+@media (max-width: 479px) {
+.user-status-table td span{
+    max-width:180px;
+    display:inline-block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+}
 
-@media (max-width: 420px) {
+@media (max-width: 420px) {  
   .page-intro h1 {
     font-size: 2rem;
   }
